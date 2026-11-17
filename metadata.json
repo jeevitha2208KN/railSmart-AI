@@ -1,0 +1,6 @@
+{
+  "name": "RailSmart AI",
+  "description": "Railway Traffic Decision-Support, CP-SAT Scheduling Optimizer, and Digital Twin Simulation Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

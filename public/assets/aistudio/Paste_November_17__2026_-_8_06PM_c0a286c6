@@ -1,0 +1,359 @@
+# RAILSMART AI – ADVANCED MASTER BUILD PROMPT (v2)
+
+> Paste everything below this line into your AI coding assistant (Claude Code / Claude / ChatGPT).
+> If the assistant's output limit is reached, it must follow the "CONTINUATION PROTOCOL" in Section 16 and never skip or summarize files.
+
+---
+
+## 0. ROLE AND MISSION
+
+You are a principal software architect, railway-operations analyst, optimization engineer and ML engineer working together.
+
+Build **RAILSMART AI**: a complete, runnable, full-stack **decision-support and Digital Twin platform** that maximizes the number of trains passing through a railway section per hour (section throughput) while minimizing delay, waiting time and congestion.
+
+It is a **simulation and decision-support prototype**. It must NEVER connect to real signalling, interlocking or train-control equipment, and every screen that shows recommendations must carry the label: *"Decision support only. Not certified for real train control. Final authority rests with the Section Controller."*
+
+Deliver everything in ONE attempt: backend, REST API, database, frontend, simulation, optimizer, ML, seed data, tests, run scripts and README. No placeholders, no "TODO", no "implement later", no pseudo-code. Every file must be complete and runnable.
+
+---
+
+## 1. REAL-WORLD PROBLEMS THIS SYSTEM MUST SOLVE
+
+Design features around these genuine pain points of railway traffic control (especially single-line and high-density Indian-style sections). Each problem maps to a feature in Section 6.
+
+| # | Real problem railway controllers face | What RailSmart must do |
+|---|---|---|
+| P1 | Section controllers decide crossings and overtakes manually using control charts, phone calls and experience | Automatic crossing/overtake/precedence recommendations with reasons |
+| P2 | Single-line sections: two opposite trains need a loop line to cross; wrong decisions cause long holds | Loop-line-aware CP-SAT model with crossing and meeting-point decisions |
+| P3 | Freight vs passenger priority conflicts; freight gets starved or blocks express trains | Configurable priority and fairness (max freight starvation time) |
+| P4 | Delay propagation (one late train delays 10 others downstream) | Delay-propagation graph and "blast radius" analysis |
+| P5 | Late rake / locomotive / crew arrival (linked rakes, crew duty-hour limits) | Rake-linkage, loco and crew-duty constraints and warnings |
+| P6 | Fog, heavy rain and heat cause speed restrictions and cancellations | Weather-driven speed factors, fog protocol, rule-based and ML impact |
+| P7 | Temporary Speed Restrictions (TSR) and maintenance blocks (traffic and power blocks) | TSR and block planner, auto re-optimization around blocks |
+| P8 | Platform shortage and platform clashes at junction stations | Platform allocation with train length, dwell and conflict avoidance |
+| P9 | Passenger connections missed because a feeder train is late | Connection-protection logic (hold vs release trade-off) |
+| P10 | Inaccurate ETAs shown to passengers | ML ETA with prediction intervals and confidence |
+| P11 | Operators distrust black-box AI | Explainability: every recommendation shows reason, rule, delay saved and who loses time |
+| P12 | Emergency, VIP and special trains must be inserted at short notice | Emergency insertion with minimal disturbance to others (re-plan in seconds) |
+| P13 | Data lives in silos (spreadsheets, charts, logs) | CSV and Excel import and export plus REST API |
+| P14 | No way to test "what if" before acting | What-if engine plus digital twin replay |
+| P15 | Maintenance is reactive; track faults cause sudden failures | Anomaly detection on simulated sensors and maintenance planner |
+| P16 | Energy waste from stop-start running | Coasting and speed-profile recommendation and energy estimate |
+| P17 | Language barrier and low digital literacy among staff | Simple UI, big colour-coded alerts, English and Hindi labels toggle |
+| P18 | Post-incident review is hard | Audit log, decision history and replay |
+
+---
+
+## 2. TECHNOLOGY STACK (stable, mainstream)
+
+- Python 3.10+
+- **Backend API:** FastAPI + Uvicorn + Pydantic v2 + SQLAlchemy 2.x
+- **Database:** SQLite (file `railsmart.db`) with SQLAlchemy ORM and Alembic-style init script. Design the schema so it can move to PostgreSQL by changing one URL.
+- **Frontend:** Streamlit multi-page app (sidebar navigation) that talks to the FastAPI backend over HTTP via a single `api_client.py`. Fallback: if the API is not running, the frontend imports the service layer directly so the demo never breaks.
+- **Optimization:** Google OR-Tools CP-SAT
+- **Simulation:** SimPy
+- **Graph model:** NetworkX
+- **ML:** scikit-learn (RandomForest, GradientBoosting, IsolationForest), optional XGBoost, SHAP optional (fallback to permutation importance)
+- **Data:** Pandas, NumPy
+- **Charts and maps:** Plotly (Gantt/time-distance graphs, charts), Folium + streamlit-folium
+- **Testing:** pytest
+- **Tooling:** `requirements.txt` with pinned compatible versions, `run.sh` and `run.bat`, `.env.example`, `.gitignore`
+- Every optional package (XGBoost, SHAP, Folium) must have an automatic fallback so the app never crashes.
+
+---
+
+## 3. ONE-FRAME ARCHITECTURE (frontend + backend + API + database)
+
+```
+┌────────────────────────────── FRONTEND (Streamlit) ──────────────────────────────┐
+│ 16+ pages · KPI cards · Plotly time-distance graph · Folium map · Copilot chat    │
+│ api_client.py  (HTTP client with retry + local-service fallback)                  │
+└───────────────────────────────────────┬──────────────────────────────────────────┘
+                                         │  JSON over REST  (http://localhost:8000/api/v1)
+┌───────────────────────────────────────▼──────────────────────────────────────────┐
+│                           BACKEND API (FastAPI)                                   │
+│  routers/: network · trains · predict · optimize · simulate · conflicts ·         │
+│            platforms · weather · maintenance · copilot · scenarios · analytics ·  │
+│            reports · admin · import_export · auth                                 │
+│  schemas/ (Pydantic)   deps/ (db session, auth, RBAC)   middleware (audit log)   │
+└───────────────────────────────────────┬──────────────────────────────────────────┘
+                                         │ service layer (pure Python, unit-tested)
+┌───────────────────────────────────────▼──────────────────────────────────────────┐
+│ SERVICES / ENGINES                                                                │
+│  network_service(NetworkX) · optimizer(CP-SAT) · simulator(SimPy) ·               │
+│  conflict_engine(rules + ML) · delay_model(ML) · platform_allocator ·             │
+│  weather_engine · maintenance_engine(IsolationForest) · energy_engine ·           │
+│  copilot_engine(intent router + SQL tools) · scenario_engine · report_engine      │
+└───────────────────────────────────────┬──────────────────────────────────────────┘
+                                         │ SQLAlchemy ORM
+┌───────────────────────────────────────▼──────────────────────────────────────────┐
+│                         DATABASE (SQLite → PostgreSQL ready)                      │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Single source of truth rule:** The optimizer, the digital twin, the conflict detector, the copilot and the dashboard MUST all read the same network and train tables. No duplicated or hardcoded data anywhere. All KPIs are computed from DB and simulation results only.
+
+---
+
+## 4. DATABASE SCHEMA (create all tables with indexes and foreign keys)
+
+- `users(id, username, password_hash, role[ADMIN|CONTROLLER|VIEWER], language, created_at)`
+- `stations(id, code, name, lat, lon, num_platforms, platform_max_length_m, has_loop, loop_count, loop_length_m, dwell_min_default, station_capacity, is_junction)`
+- `platforms(id, station_id, number, length_m, electrified, status[AVAILABLE|OCCUPIED|BLOCKED], accepts_categories)`
+- `sections(id, from_station_id, to_station_id, distance_km, track_type[SINGLE|DOUBLE], num_tracks, capacity_trains, max_speed_kmph, min_run_time_min, max_run_time_min, headway_min, direction_mode[BIDIRECTIONAL|UP_ONLY|DOWN_ONLY], electrified, gradient_factor, status[OPEN|BLOCKED|RESTRICTED])`
+- `trains(id, train_no, name, category[PASSENGER|EXPRESS|SUPERFAST|GOODS|EMERGENCY|SPECIAL], priority, direction[UP|DOWN], length_m, max_speed_kmph, origin_id, destination_id, sch_departure, sch_arrival, actual_departure, est_arrival, status, current_section_id, current_station_id, lat, lon, rake_id, crew_id, is_active)`
+- `train_routes(id, train_id, seq, station_id, sch_arrival, sch_departure, min_dwell_min, platform_id, is_stop)`
+- `rakes(id, rake_no, next_train_id, ready_time)` · `crews(id, crew_no, duty_start, max_duty_hours, base_station_id)`
+- `connections(id, feeder_train_id, connecting_train_id, station_id, min_transfer_min, passengers_est)`
+- `schedules(id, run_id, train_id, station_id, kind[ORIGINAL|OPTIMIZED], arrival, departure, section_id, entry_time, exit_time)`
+- `optimization_runs(id, created_at, scenario_id, status, objective_value, solve_time_ms, weights_json, original_kpi_json, optimized_kpi_json, constraint_report_json)`
+- `recommendations(id, run_id, train_id, action[HOLD|ADVANCE|REROUTE_TO_LOOP|CHANGE_PLATFORM|PRECEDENCE|NONE], from_time, to_time, delta_min, reason, rule_ref, trains_benefited, trains_penalized, accepted[NULL|TRUE|FALSE], decided_by, decided_at)`
+- `conflicts(id, detected_at, category, severity, section_id, station_id, train_ids_json, predicted_impact_min, recommended_action, resolved)`
+- `delay_history(id, train_id, station_id, date, sch_arrival, actual_arrival, delay_min, weather, congestion_index, hour, dow, prev_delay_min)`
+- `weather_events(id, type[RAIN|FOG|HEAT|STORM|CLEAR], severity 1-5, section_id, start, end, speed_factor, source[SIMULATED|API])`
+- `disruptions(id, type[TSR|BLOCK|BREAKDOWN|SIGNAL_FAILURE|PLATFORM_DOWN|ACCIDENT_SIM], section_id, station_id, train_id, start, end, speed_limit_kmph, description)`
+- `sensor_readings(id, section_id, ts, vibration, temperature, strain, track_gauge_dev, is_simulated=1)` · `maintenance_orders(id, section_id, priority, status, due_date, note)`
+- `sim_runs(id, scenario_id, schedule_kind, started_at, sim_speed, kpi_json)` · `sim_events(id, run_id, sim_time, train_id, event, station_id, section_id, detail)`
+- `scenarios(id, name, type, params_json, created_by, created_at)`
+- `audit_log(id, ts, user_id, action, entity, entity_id, detail_json)`
+- `copilot_log(id, ts, user_id, question, intent, sql_or_tool_used, answer)`
+
+Seed script `seed.py` must generate a **realistic synthetic corridor** (clearly labelled "SYNTHETIC DEMO DATA"):
+- 12 stations on a main line with 2 junctions, a mix of single-line and double-line sections, loop lines at intermediate stations
+- 60–80 trains/day, with mix: 40% passenger, 20% express/superfast, 30% goods, 10% special/emergency
+- 90 days of `delay_history` (≥ 20,000 rows) with realistic patterns: peak-hour congestion, fog in winter mornings, monsoon rain, freight bunching, cascading delays
+- sensor data with injected anomalies for the maintenance module
+- two demo users: `admin/admin123`, `controller/controller123` (hash passwords)
+
+---
+
+## 5. REST API (FastAPI, prefix `/api/v1`, auto OpenAPI docs at `/docs`)
+
+Implement all of these with Pydantic request/response models, proper status codes and error messages:
+
+- **Auth:** `POST /auth/login` (JWT) · `GET /auth/me`
+- **Network:** `GET/POST /stations` · `PUT/DELETE /stations/{id}` · `GET/POST /sections` · `PUT/DELETE /sections/{id}` · `GET /network/graph` · `GET /network/validate` (finds disconnected stations, invalid capacity, etc.)
+- **Trains:** `GET /trains?category=&status=&q=` · `POST /trains` · `PUT /trains/{id}` · `GET /trains/{id}` · `GET /trains/{id}/route` · `GET /trains/{id}/why-delayed`
+- **Prediction:** `POST /predict/delay` · `GET /predict/model-metrics` · `POST /predict/retrain` · `GET /predict/feature-importance`
+- **Optimization:** `POST /optimize/run` (weights, time-limit, scenario_id) · `GET /optimize/runs` · `GET /optimize/runs/{id}` · `GET /optimize/runs/{id}/recommendations` · `POST /recommendations/{id}/accept|reject` · `POST /optimize/infeasibility-diagnosis`
+- **Simulation:** `POST /sim/start|pause|resume|reset` · `POST /sim/speed` · `POST /sim/inject-delay` · `POST /sim/block-section` · `POST /sim/weather` · `GET /sim/state` · `GET /sim/events` · `POST /sim/compare`
+- **Conflicts:** `GET /conflicts` · `POST /conflicts/scan` · `GET /conflicts/propagation/{train_id}`
+- **Platforms:** `GET /platforms/{station_id}/layout` · `POST /platforms/allocate` · `POST /platforms/override`
+- **Weather / disruptions:** `GET/POST /weather` · `GET/POST /disruptions` · `POST /disruptions/{id}/recalculate`
+- **Maintenance:** `GET /maintenance/health` · `GET /maintenance/anomalies` · `POST /maintenance/orders`
+- **Copilot:** `POST /copilot/ask` · `GET /copilot/history`
+- **Scenarios:** `GET /scenarios` · `POST /scenarios/run` · `GET /scenarios/{id}/comparison`
+- **Energy:** `GET /energy/summary` · `POST /energy/speed-advice`
+- **Analytics:** `GET /analytics/kpis` · `GET /analytics/throughput` · `GET /analytics/delay-trend` · `GET /analytics/utilization`
+- **Data:** `POST /import/{trains|stations|sections|delay-history}` (CSV/Excel) · `GET /export/{schedule|report}.{csv|xlsx|pdf}`
+- **Admin:** `GET /admin/health` · `GET /admin/audit` · `POST /admin/seed` · `POST /admin/reset`
+
+---
+
+## 6. FEATURES (ALL REQUIRED) — original 12 modules PLUS advanced additions
+
+Pages (Streamlit sidebar, 16 original + 6 new = 22):
+
+**Original:** 1 Executive Dashboard · 2 Railway Network Management · 3 Live Train Monitoring · 4 AI Delay Prediction · 5 Smart Train Scheduling · 6 Digital Twin Simulation · 7 Congestion & Conflict Detection · 8 Smart Platform Allocation · 9 Weather & Disruption Intelligence · 10 Predictive Track Maintenance · 11 Railway AI Copilot · 12 What-If Scenario Simulator · 13 Energy Efficiency · 14 Performance Analytics · 15 Reports & Downloads · 16 System Administration
+
+**NEW (real-world additions):**
+17. **Time–Distance (Marey) Graph** – the standard railway "train graph": x = time, y = station position, each train a line, conflicts highlighted in red, original vs optimized side by side. This is the single most convincing visual for judges.
+18. **Section Controller Decision Console** – list of AI recommendations with Accept / Reject / Modify buttons, "why", "who benefits / who loses", delay saved, and an audit trail. Human-in-the-loop is mandatory.
+19. **Delay Propagation & Blast-Radius Analyzer** – pick a delayed train, show a graph of downstream trains affected and total minutes of knock-on delay.
+20. **Emergency & Special Train Insertion** – insert a VIP/relief/emergency train at a given time; optimizer re-plans with minimum disturbance (minimize number of trains changed and total added delay); show a before/after Marey graph.
+21. **Connection Protection & Rake/Crew Linkage** – hold-for-connection trade-off (passengers saved vs. delay caused), rake turnaround and crew-duty-hour violations.
+22. **Resilience & Capacity Planning** – "How many more trains can this section carry?": run an automatic capacity sweep (add 1, 2, 3 ... trains) and plot throughput vs delay curve; identify the bottleneck section and recommend where a new loop line or double-tracking gives max benefit (ROI-style ranking).
+
+### Feature requirements per module (be exhaustive)
+
+**M1 Executive Dashboard** – all KPIs from DB and latest sim/optimization run: total, running, delayed, waiting, completed trains; trains/hour; average delay; average waiting; track and platform utilization; predicted congestion; optimizer time; plus original-vs-optimized KPI delta cards (green/red arrows). Charts: status pie, hourly throughput bars, delay trend, section utilization heatmap, station traffic, category comparison, original vs optimized.
+
+**M2 Network Management** – full CRUD for stations/sections/platforms with validation; NetworkX graph; Folium map with colour-coded sections (single/double, blocked, restricted); network validation report; import/export CSV; "Load sample corridor" button.
+
+**M3 Live Train Monitoring** – search/filter; train detail drawer with route and timetable; animated simulated positions (clearly labelled SIMULATED GPS); status auto-updates from the digital twin; "Why is this train delayed?" explanation built from real data (previous delay, section block, weather, waiting for crossing, etc.).
+
+**M4 AI Delay Prediction** – RandomForest regressor (+ optional XGBoost, + GradientBoosting baseline) for delay minutes and classifier for risk class (ON_TIME / MINOR / MAJOR / SEVERE); features: category, hour, day of week, distance, previous delay, congestion index, weather severity, station traffic, section status, priority; **prediction intervals** via quantile models or tree-variance; metrics MAE, RMSE, R², accuracy, confusion matrix, residual plot, feature importance; model comparison table; save and load model with joblib; retrain button; calibration check—only show probability if Brier score is acceptable, otherwise show risk class only.
+
+**M5 Scheduling Optimizer (CORE) – full CP-SAT specification below (Section 7).**
+
+**M6 Digital Twin** – SimPy event-driven; train processes request section resource (capacity 1 for single track with direction lock, capacity n for multi-track) and station platforms; speed/travel-time from max speed, gradient and weather factors; events logged to `sim_events`; controls Start/Pause/Resume/Reset/Speed ×1–×100; inject delay, block section, weather; compare ORIGINAL vs OPTIMIZED schedule simulations with identical random seed; live Folium and Plotly view; export event log.
+
+**M7 Conflict & Congestion Detection** – rule engine for: overlapping occupancy, headway violation, opposite-direction meet on single line without loop, station capacity exceeded, platform clash, queue buildup, deadlock risk; severity scoring; delay-propagation estimation; ML risk score added as advisory only. Hard rules always win over AI. Each warning: train IDs, stations, section, category, impact (min), recommended action.
+
+**M8 Platform Allocation** – score-based and CP-SAT assignment considering train length vs platform length, category compatibility, dwell time, electrification, priority, avoiding clashes, preferring same platform for through trains; visual station layout (Plotly shapes) with trains on platforms; manual override with audit.
+
+**M9 Weather & Disruption Intelligence** – simulated or API weather (if `WEATHER_API_KEY` set, use Open-Meteo which needs no key as the default real source; label SIMULATED vs LIVE); fog protocol (speed cap and headway increase), rain, storm, heat; TSR and block planner; breakdown; each event triggers re-optimization and shows delta impact.
+
+**M10 Predictive Maintenance** – simulated sensors; IsolationForest + rolling z-score; health score 0–100 per section; priority ranking; inspection suggestions; maintenance-block suggestions placed in low-traffic windows (optimizer finds the best slot with minimal throughput loss); every reading labelled SIMULATED.
+
+**M11 Railway AI Copilot** – hybrid architecture: (1) **intent router** (keyword and regex plus optional LLM) maps the question to a deterministic **tool function** (SQL or service call); (2) the tool returns structured data; (3) answer template renders it; (4) optional LLM (if `LLM_API_KEY` set) only *rephrases* the verified data, never adds facts. Support at least 25 intents: delayed trains, most congested section, why Train X delayed, affected trains by disruption, current throughput, waiting time reduction, explain schedule, compare schedules, platform status, next conflicts, maintenance alerts, energy savings, etc. If data is missing say "I don't have that data". Show the data table or SQL used under each answer ("Show evidence"). Voice input optional.
+
+**M12 What-If Simulator** – scenarios: +10/20/30 min delay, section blocked, station congestion, platform down, heavy rain, fog, extra train, freight surge, double failure; pipeline: apply → detect affected → predict → optimize → simulate → compare; charts: delay, waiting, throughput, completed trains, per-train bars, Marey before/after; save scenarios; "worst-case sweep" batch runner.
+
+**M13 Energy** – estimate energy from distance, mass proxy by category, speed profile, number of stops; stop-start penalty; coasting/speed-advice recommendation; kWh and CO₂ estimate (clearly "estimated model"); optimized-schedule energy savings from fewer unplanned stops.
+
+**M14 Performance Analytics** – OTP (on-time performance), average delay by category/section/hour, throughput trend, utilization heatmap, bottleneck ranking, optimizer improvement history.
+
+**M15 Reports** – generate PDF/Excel/CSV: daily operations report, optimization report, scenario comparison, maintenance report; include charts, tables, assumptions and the disclaimer.
+
+**M16 Admin** – user management, RBAC (ADMIN full, CONTROLLER operate, VIEWER read-only), optimizer weights, safety parameters (headway, dwell, clearance times) with default values and documentation, model retrain, DB seed/reset, audit log viewer, system health, EN/Hindi label toggle.
+
+---
+
+## 7. OPTIMIZER SPECIFICATION (CP-SAT) — build exactly this
+
+**Time model:** discretize to 1-minute integer ticks over a planning horizon (default 6 h, configurable).
+
+**Decision variables** for each train `t` and each route node `n` (station) and each section `s` on its route:
+- `arr[t,n]`, `dep[t,n]` ∈ [earliest, horizon] (IntVar)
+- `enter[t,s]`, `exit[t,s]` ∈ horizon
+- `served[t]` Bool (train completes within horizon)
+- `loop_use[t,n]` Bool (train waits in loop at n)
+- `plat[t,n,p]` Bool (platform assignment)
+- `delay[t]` = `arr[t,dest]` − `sch_arr[t]` (≥ 0 via max)
+- `order[t1,t2,s]` Bool for every pair of trains using same section (precedence)
+
+**Constraints (all configurable and documented in the UI):**
+1. Running time: `min_run ≤ exit − enter ≤ max_run` (adjusted for weather/TSR factor).
+2. Dwell: `dep[t,n] − arr[t,n] ≥ min_dwell[t,n]`; no departure before scheduled departure (can't leave early) unless the train is flagged "may advance".
+3. Single-track direction lock: if two trains use the same single section in **opposite** directions, intervals must not overlap (`NoOverlap`/`AddNoOverlap` with optional intervals plus clearance time); crossing is possible only at stations with `has_loop`/free platform; model with loop capacity.
+4. Same-direction headway: following train enters ≥ `headway` after the leader enters and cannot exit before leader exits (no overtaking inside section; overtaking allowed only at loop/platform stations).
+5. Double-track: per-direction capacity = 1 track with headway.
+6. Section capacity: `AddCumulative` on section intervals for multi-track.
+7. Station capacity and platforms: `AddNoOverlap` per platform; `AddCumulative` for station capacity; platform length ≥ train length; category compatibility.
+8. Blocks/TSR/weather: forbidden intervals on section (block) or slower running (TSR/weather).
+9. Priority/precedence: higher priority trains can't be delayed to benefit lower priority ones unless net-weighted delay drops by a configurable margin; emergency trains are hard-prioritized.
+10. Rake linkage: `dep[next_train] ≥ arr[prev_train] + turnaround`; crew duty ≤ max hours.
+11. Connection protection: soft constraint with passenger-weighted penalty and maximum hold limit (e.g. 10 min).
+12. Minimum-change: limit |new_time − original_time| ≤ `max_shift` (default 30 min) and penalize every changed train.
+13. Safety parameters are **inputs with defaults** (headway 5 min, clearance 2 min, etc.) stored in admin settings. Do NOT claim they are official railway rules.
+
+**Objective (weighted, with weights editable in UI, plus a lexicographic mode):**
+`maximize  W1·Σserved − W2·Σ(priority_weight[t]·delay[t]) − W3·Σwaiting − W4·Σchanged[t] − W5·Σ|shift| − W6·connection_misses + W7·utilization_balance`
+Default weights: W1=1000, W2=10, W3=5, W4=3, W5=1, W6=50, W7=2.
+
+**Solver settings:** `num_workers=8`, `max_time_in_seconds` from UI (default 20), use a **warm-start hint** from the original schedule, add symmetry-breaking, return best feasible on timeout with the optimality gap, log solve statistics. Add a heuristic **fallback** (priority-based greedy dispatch with simple crossing rules) used if CP-SAT finds nothing, so the user always gets a result.
+
+**Outputs:**
+- Original vs Optimized schedule tables with changed rows highlighted
+- Per-train recommendation with **reason text** generated from the solution (e.g. "Hold Train 12951 at loop at Station C for 6 min to let Train 12002 cross; saves 14 min total delay for 3 trains")
+- Throughput (trains/hour), total delay, waiting, utilization before/after
+- Constraint validation report (re-check the final schedule with an independent verifier function; show PASS/FAIL per constraint)
+- Solve time, status, gap
+- **Infeasibility diagnosis:** if INFEASIBLE, relax constraint groups one at a time (using assumptions / `AddAssumptions` or sequential relaxation) and report which constraints cause it and suggest fixes.
+- **Incremental re-optimization:** when a disruption occurs, freeze trains already in section ("committed") and re-optimize only the remaining ones within a few seconds.
+
+---
+
+## 8. REAL-DATA INTEGRATION (optional adapters, all behind interfaces)
+
+Build adapter classes with a common interface (`DataSource.get_trains()`, `get_weather()`, `get_delays()`), implemented for:
+- `SyntheticSource` (default)
+- `CSVSource` (user uploads real timetable and delay logs)
+- `OpenMeteoSource` (free real weather, no API key)
+- `NTESLikeSource` (stub that reads a documented JSON format; do not scrape any website)
+
+Document clearly in README that real railway feeds require authorization and that the app uses simulated GPS unless authorized data is provided.
+
+---
+
+## 9. UI / UX REQUIREMENTS
+
+- Dark navy control-room theme (#0B1B33 background, cyan/teal accents, amber warning, red critical, green success); custom CSS injected once; consistent KPI card component; skeleton loaders and spinners; toasts.
+- Sidebar grouped into sections (Operations, Intelligence, Planning, Admin).
+- Persistent top bar: current simulated time, active scenario, optimizer status, simulation/real data badge (**"SIMULATED DATA"** always visible), disclaimer.
+- Big colour-coded alert banners for critical conflicts.
+- Every chart has titles, units, hover info and download button.
+- Loading states and friendly error messages; never show raw stack traces.
+- English / Hindi toggle for key labels.
+- Accessible colours (don't rely on red/green only; add icons).
+
+---
+
+## 10. SECURITY, SAFETY AND ETHICS
+
+- JWT auth, bcrypt hashing, role-based access, input validation, parameterised queries (no raw string SQL).
+- Copilot may only run **whitelisted tool functions**, never arbitrary SQL from user text.
+- Audit log for every accept/reject, config change, optimization run.
+- Banner and README disclaimers: simulation only, not certified, human decision authority, no real signalling integration.
+- Never fabricate live data; label all synthetic, simulated and predicted values.
+
+---
+
+## 11. FOLDER STRUCTURE (create exactly)
+
+```
+railsmart-ai/
+├── README.md  requirements.txt  .env.example  .gitignore  run.sh  run.bat  Makefile
+├── backend/
+│   ├── main.py  config.py  database.py  models.py  schemas.py  security.py
+│   ├── routers/ (network, trains, predict, optimize, simulate, conflicts, platforms,
+│   │             weather, maintenance, copilot, scenarios, energy, analytics,
+│   │             reports, admin, data_io, auth)
+│   ├── services/ (network_service, optimizer, optimizer_heuristic, verifier,
+│   │              simulator, conflict_engine, delay_model, platform_allocator,
+│   │              weather_engine, maintenance_engine, energy_engine,
+│   │              copilot_engine, scenario_engine, report_engine, propagation)
+│   ├── adapters/ (synthetic, csv_source, open_meteo, ntes_like)
+│   └── seed.py
+├── frontend/
+│   ├── app.py  api_client.py  theme.py  components.py  i18n.py
+│   └── pages/ 01_..._22_.py
+├── ml/  (train_delay_model.py, models/)
+├── data/ (sample CSVs)
+├── tests/ (test_optimizer.py, test_verifier.py, test_simulator.py, test_conflicts.py,
+│           test_api.py, test_copilot.py, test_delay_model.py)
+└── docs/ (architecture.md, api.md, algorithms.md, demo_script.md, problem_statement_mapping.md)
+```
+
+---
+
+## 12. TESTING AND QUALITY GATES (must pass before finishing)
+
+1. `pytest` passes: optimizer returns a schedule that the independent verifier marks as valid; no two opposite trains overlap on single track; headways respected; platform lengths respected; blocked sections respected.
+2. Optimized total delay ≤ original total delay on the seeded demo (and print by how much).
+3. Digital twin run with the same seed gives deterministic results.
+4. All API endpoints return valid JSON; OpenAPI loads.
+5. Copilot answers 25 test questions with data matching direct DB queries.
+6. App starts with one command and shows no exceptions on any page.
+7. Type hints and docstrings on all public functions; no unused code; no hardcoded KPI values.
+
+---
+
+## 13. DEMO DATA GUARANTEES (so the hackathon demo always impresses)
+
+Seed must include a deliberately **congested single-line section** where the original timetable causes: 3 crossing conflicts, a freight train blocking an express, and one platform clash. The optimizer must visibly improve it: target ≥ 15–30 % reduction in total delay and ≥ 10 % throughput gain (report the honest measured figures, do not hardcode them).
+
+---
+
+## 14. HACKATHON DEMO SCRIPT (generate as `docs/demo_script.md`, 5 minutes)
+
+1. Show Executive Dashboard (live KPIs from DB).
+2. Open Marey graph of the original schedule with red conflicts.
+3. Click **Optimize** → show new Marey graph, delta KPIs, reasons for each change.
+4. Accept one recommendation in the Decision Console (audit logged).
+5. Digital Twin: run original vs optimized side-by-side, inject a 20-min delay, re-optimize live.
+6. Weather: turn on fog, show re-plan.
+7. Insert emergency train, show minimal disturbance.
+8. Capacity sweep: "How many more trains can we add?"
+9. Ask the Copilot 3 questions and show evidence.
+10. Export PDF report.
+
+Also generate `docs/problem_statement_mapping.md` mapping each requirement of the original problem statement to the module and file that implements it.
+
+---
+
+## 15. DELIVERY FORMAT
+
+1. Start with a short architecture summary and the file tree.
+2. Then output **every file in full**, each in its own code block with its path as heading.
+3. Finish with exact commands: install, seed, run backend, run frontend, run tests.
+4. List known limitations honestly (what is simulated, what needs real data).
+5. Do not ask me questions; make reasonable assumptions and document them.
+
+## 16. CONTINUATION PROTOCOL (for output-length limits)
+
+If you cannot output all files in one response: output files in this order and stop at a file boundary, ending with `--- PART n COMPLETE: next file = <path> ---`. I will reply "continue" and you resume exactly at that file without repeating earlier files.
+Order: (1) config, database, models, schemas, security → (2) seed + adapters → (3) services (optimizer, verifier, simulator first) → (4) routers + main.py → (5) ML → (6) frontend theme/components/api_client/app → (7) pages 01–22 → (8) tests → (9) docs, README, run scripts.
+
+BEGIN NOW.
